@@ -36,6 +36,10 @@ contract DeployScript is Script {
 
             console2.logString("CopeToken owner: ");
             console2.logAddress(copeToken.owner());
+
+            // deposit 0.05 ether into slots game
+            slotsAtViceCasino.depositEther{ value: 0.05 ether }();
+
         vm.stopBroadcast();
     }
 }

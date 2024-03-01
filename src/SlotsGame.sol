@@ -83,6 +83,10 @@ contract SlotsAtViceCasino is Ownable, ReentrancyGuard {
         payable(owner()).transfer(balance);
     }
 
+    function depositEther() external payable {
+        if (msg.value <= 0) revert InsufficientBalance();
+    }
+
     // Allow the contract to receive Ether
     receive() external payable {}
 }
