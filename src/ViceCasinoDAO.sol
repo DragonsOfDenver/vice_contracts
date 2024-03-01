@@ -59,19 +59,24 @@ contract ViceCasinoDAO is Ownable {
     error NotCopeHolder(address _msgSender);
     error AlreadyVoted(address _voter, uint256 _id);
     error InvalidProposalState(uint256 _id, ProposalState state);
+    error InvalidEndBlockForVoting(uint256 _id, uint256 endBlock);
     error VotingPeriodOver(uint256 _id);
 
     modifier isCopeTokenHolder() {
-        require(copeToken.balanceOf(msg.sender) > 0, "Not a COPE holder");
+        if(copeToken.balanceOf(msg.sender) == 0) revert NotCopeHolder(msg.sender);
         _;
     }
 
-    constructor(address _copeToken, address _owner) Ownable(_owner) {
+    constructor(
+        address _owner,
+        address _copeToken
+    ) Ownable(_owner) {
         copeToken = IERC20(_copeToken);
     }
 
     function createProposal(string memory _title, string memory _description, uint256 _endBlock) public isCopeTokenHolder {
-        require(_endBlock > block.number, "End block must be in the future");
+        // Ensure the end block is in the future by 5760 block close to (24Hrs)
+        if (block.number + 5760 >= _endBlock) revert InvalidEndBlockForVoting(proposalCount, _endBlock);
 
         proposalCount++;
         Proposal storage proposal = proposals[proposalCount];
