@@ -38,5 +38,9 @@ contract DeployScript is Script {
             console2.logAddress(copeToken.owner());
         vm.stopBroadcast();
     }
-    
 }
+
+
+/*
+forge script script/Deploy.s.sol:DeployScript --rpc-url $SEPOLIA_RPC_URL --verify --broadcast
+*/
