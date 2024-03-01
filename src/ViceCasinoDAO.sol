@@ -4,9 +4,9 @@ pragma solidity 0.8.23;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract CasinoVice is Ownable {
+contract ViceCasinoDAO is Ownable {
 
-    IERC20 public viceToken;
+    IERC20 public copeToken;
 
     enum ProposalState {
         Pending,
@@ -62,14 +62,14 @@ contract CasinoVice is Ownable {
         address _owner,
         address _viceToken
     ) Ownable(_owner) {
-        viceToken = IERC20(_viceToken);
+        copeToken = IERC20(_viceToken);
     }
 
     error NotCopeHolder(address _msgSender);
     error AlreadyVoted(address _voter, uint256 _id);
 
     modifier isCopeTokenHolder() {
-        if(viceToken.balanceOf(msg.sender) == 0) revert NotCopeHolder(msg.sender);
+        if(copeToken.balanceOf(msg.sender) == 0) revert NotCopeHolder(msg.sender);
         _;
     }
 
@@ -133,6 +133,10 @@ contract CasinoVice is Ownable {
 
     function getProposalCount() public view returns(uint256 _proposalCount) {
         return proposalCount;
+    }
+
+    function hasVotedOnProposal(uint256 _id) public view returns(bool _hasVoted) {
+        return proposals[_id].voters[msg.sender];
     }
 
 }
