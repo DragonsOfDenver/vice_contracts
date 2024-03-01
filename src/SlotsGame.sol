@@ -33,9 +33,7 @@ contract SlotsAtViceCasino is Ownable, ReentrancyGuard {
     
     function playSlots() external payable nonReentrant {
         if (msg.value < HACKATHON_BET_AMOUNT) revert InsufficientBetAmount();
-        if (copeToken.balanceOf(address(this)) < COPE_TOKEN_REWARD_PER_SPIN) revert InsufficientBalance();
         if (address(this).balance < PAYOUT_WIN_FOR_5_SYMBOLS) revert InsufficientBalanceToPayWinner();
-        if (copeToken.balanceOf(address(this)) < COPE_TOKEN_REWARD_PER_SPIN) revert InsufficientCopeTokenBalance();
 
         // Simplified RNG game logic
         // DO NOT USE THIS IN PRODUCTION, THIS IS FOR HACKATHON PURPOSES ONLY

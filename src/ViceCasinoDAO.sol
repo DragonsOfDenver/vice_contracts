@@ -1,11 +1,10 @@
-//SPDX-LICENSE-Identifier: MIT
+// SPDX-License-Identifier: MIT
 pragma solidity 0.8.23;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract ViceCasinoDAO is Ownable {
-
     IERC20 public copeToken;
 
     enum ProposalState {
@@ -31,7 +30,7 @@ contract ViceCasinoDAO is Ownable {
         uint256 startBlock;
         uint256 endBlock;
         ProposalState state;
-        mapping(address => bool) voters;
+        mapping(address => uint256) voters;
     }
 
     struct ReturnProposal {
@@ -46,77 +45,88 @@ contract ViceCasinoDAO is Ownable {
         ProposalState state;
     }
 
+    
+
     uint256 public proposalCount;
-    uint256 public quorumVotes;
-    uint256 public voteSpan;
-    uint256 public minimumVotesForProposal;
     uint256 public minimumVotesForQuorum;
 
     mapping(uint256 => Proposal) public proposals;
 
     event ProposalCreated(uint256 indexed id, address indexed proposer);
-    event Voted(uint256 indexed id, address indexed voter, bool vote, uint256 votesFor, uint256 votesAgainst);
-    
-
-    constructor(
-        address _owner,
-        address _viceToken
-    ) Ownable(_owner) {
-        copeToken = IERC20(_viceToken);
-    }
+    event Voted(uint256 indexed id, address indexed voter, Vote vote, uint256 votesFor, uint256 votesAgainst);
+    event ProposalStateUpdated(uint256 indexed id, ProposalState newState);
 
     error NotCopeHolder(address _msgSender);
     error AlreadyVoted(address _voter, uint256 _id);
+    error InvalidProposalState(uint256 _id, ProposalState state);
+    error VotingPeriodOver(uint256 _id);
 
     modifier isCopeTokenHolder() {
-        if(copeToken.balanceOf(msg.sender) == 0) revert NotCopeHolder(msg.sender);
+        require(copeToken.balanceOf(msg.sender) > 0, "Not a COPE holder");
         _;
     }
 
-    function createProposal(
-        string memory _title,
-        string memory description,
-        uint256 _endBlock
-    ) public isCopeTokenHolder() {
-        // Increment proposal count
+    constructor(address _copeToken, address _owner) Ownable(_owner) {
+        copeToken = IERC20(_copeToken);
+    }
+
+    function createProposal(string memory _title, string memory _description, uint256 _endBlock) public isCopeTokenHolder {
+        require(_endBlock > block.number, "End block must be in the future");
+
         proposalCount++;
+        Proposal storage proposal = proposals[proposalCount];
+        proposal.id = proposalCount;
+        proposal.proposer = msg.sender;
+        proposal.title = _title;
+        proposal.description = _description;
+        proposal.startBlock = block.number;
+        proposal.endBlock = _endBlock;
+        proposal.state = ProposalState.Active;
 
-        // Create proposal
-        Proposal storage _proposal = proposals[proposalCount];
-        _proposal.id = proposalCount;
-        _proposal.proposer = msg.sender;
-        _proposal.title = _title;
-        _proposal.description = description;
-        _proposal.startBlock = block.number;
-        _proposal.endBlock = _endBlock;
-
-        emit ProposalCreated(_proposal.id, _proposal.proposer);
+        emit ProposalCreated(proposal.id, proposal.proposer);
     }
 
-    function voteOnProposal(
-        uint256 _id,
-        Vote _vote
-    ) public isCopeTokenHolder() {
-        Proposal storage _proposal = proposals[_id];
+    function voteOnProposal(uint256 _id, Vote _vote) public isCopeTokenHolder {
+        Proposal storage proposal = proposals[_id];
 
-        // Check if voter has already voted
-        if(_proposal.voters[msg.sender]) revert AlreadyVoted(msg.sender, _id);
+        require(proposal.state == ProposalState.Active, "Proposal is not active");
+        require(block.number <= proposal.endBlock, "Voting period has ended");
+        require(proposal.voters[msg.sender] == 0, "Already voted");
 
-        // Update voter status
-        _proposal.voters[msg.sender] = true;
+        uint256 votingPower = copeToken.balanceOf(msg.sender);
+        proposal.voters[msg.sender] = votingPower;
 
-        // Update proposal vote count
-        if(_vote == Vote.For) {
-            _proposal.votesFor++;
-            _proposal.votesFor >= minimumVotesForProposal ? _proposal.state = ProposalState.Passed : _proposal.state = ProposalState.Active;
-        } else if(_vote == Vote.Against) {
-            _proposal.votesAgainst++;
-            _proposal.votesAgainst >= minimumVotesForProposal ? _proposal.state = ProposalState.Defeated : _proposal.state = ProposalState.Active;
+        if (_vote == Vote.For) {
+            proposal.votesFor += votingPower;
+        } else if (_vote == Vote.Against) {
+            proposal.votesAgainst += votingPower;
+        } // Abstain does not affect vote counts
+
+        emit Voted(_id, msg.sender, _vote, proposal.votesFor, proposal.votesAgainst);
+
+        // Check if we can conclude the vote immediately after voting
+        _updateProposalState(_id);
+    }
+
+    function finalizeProposal(uint256 _id) public {
+        _updateProposalState(_id);
+    }
+
+    function _updateProposalState(uint256 _id) internal {
+        Proposal storage proposal = proposals[_id];
+
+        require(proposal.state == ProposalState.Active, "Proposal is not active");
+        if (block.number > proposal.endBlock) {
+            if ((proposal.votesFor + proposal.votesAgainst >= minimumVotesForQuorum) && (proposal.votesFor > proposal.votesAgainst)) {
+                proposal.state = ProposalState.Passed;
+            } else {
+                proposal.state = ProposalState.Defeated;
+            }
+            emit ProposalStateUpdated(_id, proposal.state);
         }
-        emit Voted(_id, msg.sender, _vote == Vote.For, _proposal.votesFor, _proposal.votesAgainst);
     }
 
-    function getProposal(uint256 _id) public view returns(ReturnProposal memory _proposal) {
+    function getProposal(uint256 _id) public view returns (ReturnProposal memory) {
         Proposal storage proposal = proposals[_id];
         return ReturnProposal(
             proposal.id,
@@ -131,12 +141,11 @@ contract ViceCasinoDAO is Ownable {
         );
     }
 
-    function getProposalCount() public view returns(uint256 _proposalCount) {
+    function getProposalCount() public view returns (uint256) {
         return proposalCount;
     }
 
-    function hasVotedOnProposal(uint256 _id) public view returns(bool _hasVoted) {
-        return proposals[_id].voters[msg.sender];
+    function hasVotedOnProposal(uint256 _id, address _voter) public view returns (bool) {
+        return proposals[_id].voters[_voter] > 0;
     }
-
 }

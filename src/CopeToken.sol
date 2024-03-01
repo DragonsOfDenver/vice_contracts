@@ -20,3 +20,5 @@ contract CopeToken is ERC20, Ownable {
         _mint(_to, _amount);
     }
 }
+
+
