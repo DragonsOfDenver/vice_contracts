@@ -36,6 +36,8 @@ contract SlotsAtViceCasino is Ownable, VRFConsumerBaseV2, ReentrancyGuard {
     uint256[] public s_randomWords;
     uint256 public s_requestId;
 
+    mapping(uint256 => address) private requestToPlayer;
+
     event GamePlayed(address player, uint256 amount, uint256[5] slotsResults, bool isWinner);
     event RequestSent(uint256 requestId, uint32 numWords);
 
@@ -71,7 +73,8 @@ contract SlotsAtViceCasino is Ownable, VRFConsumerBaseV2, ReentrancyGuard {
             callbackGasLimit,
             numWords            
         );
-
+        
+        requestToPlayer[s_requestId] = msg.sender; // Map request ID to the player
         // Distribute COPE tokens regardless of win/loss
         copeToken.mint(msg.sender, COPE_TOKEN_REWARD_PER_SPIN);
 
@@ -85,16 +88,20 @@ contract SlotsAtViceCasino is Ownable, VRFConsumerBaseV2, ReentrancyGuard {
         bool win = false;
         uint256 maxConsecutive = 0;
         uint256 currentConsecutive = 1;
+        
+        // Artificially increase the frequency of a particular symbol in the third slot
+        // For example, if we want to increase the chance of symbol '5' appearing in the third slot
+        randomWords[2] = (randomWords[2] % 5) + 1; // Adjust the range if you want specific symbols to appear more frequently
 
         for (uint256 i = 0; i < 5; i++) {
-            slotsResults[i] = randomWords[i] % 6;
+            slotsResults[i] = randomWords[i] % 6; // Remainder will always be between 0 and 5, inclusive
             if (i > 0 && slotsResults[i] == slotsResults[i - 1]) {
                 currentConsecutive++;
                 if (currentConsecutive > maxConsecutive) {
                     maxConsecutive = currentConsecutive;
                 }
             } else {
-                currentConsecutive = 1;
+                currentConsecutive = 1; // Reset consecutive count for different symbols
             }
         }
 
@@ -107,12 +114,13 @@ contract SlotsAtViceCasino is Ownable, VRFConsumerBaseV2, ReentrancyGuard {
             else if (maxConsecutive == 5) payout = PAYOUT_WIN_FOR_5_SYMBOLS;
 
             if (payout > 0) {
-                payable(msg.sender).transfer(payout);
+                payable(requestToPlayer[requestId]).transfer(payout); // Award to the correct player from request id to address mapping
             }
         }
 
-        emit GamePlayed(msg.sender, msg.value, slotsResults, win);
+        emit GamePlayed(requestToPlayer[requestId], msg.value, slotsResults, win);
     }
+
 
     function withdrawCopeToken(uint256 _amount) external onlyOwner {
         copeToken.transfer(owner(), _amount);
