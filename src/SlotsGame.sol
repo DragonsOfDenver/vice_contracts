@@ -14,10 +14,9 @@ contract SlotsAtViceCasino is Ownable, ReentrancyGuard {
     // Payout win ods
     uint256 public constant PAYOUT_WIN_FOR_3_SYMBOLS = 0.0001 ether;
     uint256 public constant PAYOUT_WIN_FOR_4_SYMBOLS = 0.001 ether;
-    uint256 public constant PAYOUT_WIN_FOR_5_SYMBOLS = 0.001 ether;
+    uint256 public constant PAYOUT_WIN_FOR_5_SYMBOLS = 0.002 ether;
 
-    event GamePlayed(address player, uint256 amount, uint256[5] slotsResults);
-    event GameWon(address winner, uint256 amount);
+    event GamePlayed(address player, uint256 amount, uint256[5] slotsResults, bool isWinner);
 
     error InsufficientBetAmount();
     error InsufficientBalanceToPayWinner();
@@ -38,38 +37,47 @@ contract SlotsAtViceCasino is Ownable, ReentrancyGuard {
         // Simplified RNG game logic
         // DO NOT USE THIS IN PRODUCTION, THIS IS FOR HACKATHON PURPOSES ONLY
         // In a real game, you would want to use something like Chainlink VRF
-        uint256[5] memory slotsResults;
-        uint256 matchCount = 1; // Init match count
+         uint256[5] memory slotsResults;
+        bool win = false;
+        uint256 maxConsecutive = 0;
+        uint256 currentConsecutive = 1; // Start at 1 to count the first symbol
 
-        // Init True varable
-        bool win = true; // Assume win, prove otherwise
+        // Simplified RNG game logic
+        // DO NOT USE THIS IN PRODUCTION, THIS IS FOR HACKATHON PURPOSES ONLY
+        // In a real game, you would want to use something like Chainlink VRF
         for (uint i = 0; i < 5; i++) {
-            slotsResults[i] = (uint256(keccak256(abi.encodePacked(block.timestamp, msg.sender, i))) % 6) + 1;
-            if (i > 0 && slotsResults[i] != slotsResults[i - 1]) {
-                win = false;
-            } else if (i > 0) {
-                matchCount++;
+            slotsResults[i] = (uint256(keccak256(abi.encodePacked(block.timestamp, msg.sender, i))) % 6);
+            if (i > 0 && slotsResults[i] == slotsResults[i - 1]) {
+                currentConsecutive++;
+                if (currentConsecutive > maxConsecutive) {
+                    maxConsecutive = currentConsecutive;
+                }
+            } else {
+                currentConsecutive = 1; // Reset if no match
             }
         }
         
+        win = maxConsecutive >= 3; // Win condition: at least 3 in a row
+        
         uint256 payout = 0;
-        if (matchCount == 3) {
-            payout = PAYOUT_WIN_FOR_3_SYMBOLS;
-        } else if (matchCount == 4) {
-            payout = PAYOUT_WIN_FOR_4_SYMBOLS;
-        } else if (matchCount == 5) {
-            payout = PAYOUT_WIN_FOR_5_SYMBOLS;
+        if (win) {
+            if (maxConsecutive == 3) {
+                payout = PAYOUT_WIN_FOR_3_SYMBOLS;
+            } else if (maxConsecutive == 4) {
+                payout = PAYOUT_WIN_FOR_4_SYMBOLS;
+            } else if (maxConsecutive == 5) {
+                payout = PAYOUT_WIN_FOR_5_SYMBOLS;
+            }
+
+            if (payout > 0) {
+                payable(msg.sender).transfer(payout);
+            }
         }
-        
-        if (payout > 0) {
-            payable(msg.sender).transfer(payout);
-            emit GameWon(msg.sender, payout);
-        }
-        
+
         // Distribute COPE tokens regardless of win/loss
         copeToken.mint(msg.sender, COPE_TOKEN_REWARD_PER_SPIN);
 
-        emit GamePlayed(msg.sender, msg.value, slotsResults);
+        emit GamePlayed(msg.sender, msg.value, slotsResults, win);
     }
 
 
