@@ -1,8 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.23;
 
+/// @title ViceCasinoDAO
+/// @notice Very simple and basic DAO for ViceCasino
+/// @dev This contract is used to create and vote on proposals for ViceCasino, using COPE tokens
+
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 
 contract ViceCasinoDAO is Ownable {
     IERC20 public copeToken;
@@ -145,6 +150,8 @@ contract ViceCasinoDAO is Ownable {
             proposal.state
         );
     }
+
+
 
     function getProposalCount() public view returns (uint256) {
         return proposalCount;

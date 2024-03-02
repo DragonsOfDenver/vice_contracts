@@ -9,7 +9,9 @@ import {SlotsAtViceCasino} from "src/SlotsGame.sol";
 contract DeployScript is Script {
     function run() external {
         
-
+        address sepoliaCoordinator = 0x8103B0A8A00be2DDC778e6e7eaa21791Cd364625;
+        bytes32 keyHash = 0x474e34a077df58807dbe9c96d3c009b23b3c6d0cce433e59bbf5b34f823bc56c;
+        uint64 subscriptionId = 9859;
         address deployer = 0x289f0A29071a4fDf92F54FB8D580377dA94491d5;
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
@@ -24,7 +26,13 @@ contract DeployScript is Script {
             console2.logAddress(address(viceCasinoDAO));
 
             // Deploy SlotsAtViceCasino
-            SlotsAtViceCasino slotsAtViceCasino = new SlotsAtViceCasino(deployer, address(copeToken));
+            SlotsAtViceCasino slotsAtViceCasino = new SlotsAtViceCasino(
+                sepoliaCoordinator,
+                deployer,
+                address(copeToken),
+                keyHash,
+                subscriptionId
+            );
             console2.logString("SlotsAtViceCasino deployed at: ");
             console2.logAddress(address(slotsAtViceCasino));
 
